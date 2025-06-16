@@ -1,5 +1,5 @@
-const axios = require('axios');
-const { logger } = require('./logger');
+import axios from 'axios';
+import { logger } from './logger.js';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 segundo
@@ -24,4 +24,4 @@ const retryAxios = async (config, retries = MAX_RETRIES) => {
   }
 };
 
-module.exports = retryAxios; 
+export default retryAxios; 

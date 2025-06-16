@@ -1,4 +1,4 @@
-const { logger } = require('../utils/logger');
+import { logger } from '../utils/logger.js';
 
 const dataExchangeHandler = async (data) => {
   logger.info('Processando ação data_exchange', { data });
@@ -18,4 +18,4 @@ const dataExchangeHandler = async (data) => {
   };
 };
 
-module.exports = dataExchangeHandler; 
+export default dataExchangeHandler; 

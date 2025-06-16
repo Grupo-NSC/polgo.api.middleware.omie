@@ -1,4 +1,4 @@
-const { logger } = require('../utils/logger');
+import { logger } from '../utils/logger.js';
 
 const initHandler = async (data) => {
   logger.info('Processando ação init', { data });
@@ -17,4 +17,4 @@ const initHandler = async (data) => {
   };
 };
 
-module.exports = initHandler; 
+export default initHandler; 

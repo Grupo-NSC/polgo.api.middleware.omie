@@ -1,5 +1,5 @@
-const { logger } = require('../utils/logger');
-const retryAxios = require('../utils/retryAxios');
+import { logger } from '../utils/logger.js';
+import retryAxios from '../utils/retryAxios.js';
 
 const processarCashout = async (data) => {
   logger.info('Processando cashout', { data });
@@ -16,6 +16,4 @@ const processarCashout = async (data) => {
   };
 };
 
-module.exports = {
-  processarCashout
-}; 
+export { processarCashout }; 

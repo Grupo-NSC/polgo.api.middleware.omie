@@ -2,6 +2,7 @@
   "name": "polgo.api.middleware.omie",
   "version": "1.0.0",
   "description": "Middleware de integração do polgo.api com o OmiePDV",
+  "type": "module",
   "main": "handler.js",
   "scripts": {
     "dev": "serverless offline",

@@ -1,6 +1,6 @@
-const { logger } = require('./utils/logger');
-const initHandler = require('./actions/init');
-const dataExchangeHandler = require('./actions/dataExchange');
+import { logger } from './utils/logger.js';
+import initHandler from './actions/init.js';
+import dataExchangeHandler from './actions/dataExchange.js';
 
 const omieWebhookHandler = async (event) => {
   try {
@@ -33,6 +33,4 @@ const omieWebhookHandler = async (event) => {
   }
 };
 
-module.exports = {
-  omieWebhookHandler
-}; 
+export { omieWebhookHandler }; 

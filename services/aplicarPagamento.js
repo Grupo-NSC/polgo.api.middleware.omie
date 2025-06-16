@@ -1,5 +1,5 @@
-const { logger } = require('../utils/logger');
-const retryAxios = require('../utils/retryAxios');
+import { logger } from '../utils/logger.js';
+import retryAxios from '../utils/retryAxios.js';
 
 const aplicarPagamento = async (data) => {
   logger.info('Aplicando pagamento', { data });
@@ -17,6 +17,4 @@ const aplicarPagamento = async (data) => {
   };
 };
 
-module.exports = {
-  aplicarPagamento
-}; 
+export { aplicarPagamento }; 

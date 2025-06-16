@@ -1,5 +1,5 @@
-const { logger } = require('../utils/logger');
-const retryAxios = require('../utils/retryAxios');
+import { logger } from '../utils/logger.js';
+import retryAxios from '../utils/retryAxios.js';
 
 const verificarToken = async (token) => {
   logger.info('Verificando token', { token });
@@ -15,6 +15,4 @@ const verificarToken = async (token) => {
   };
 };
 
-module.exports = {
-  verificarToken
-}; 
+export { verificarToken }; 

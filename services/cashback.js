@@ -1,5 +1,5 @@
-const { logger } = require('../utils/logger');
-const retryAxios = require('../utils/retryAxios');
+import { logger } from '../utils/logger.js';
+import retryAxios from '../utils/retryAxios.js';
 
 const processarCashback = async (data) => {
   logger.info('Processando cashback', { data });
@@ -15,6 +15,4 @@ const processarCashback = async (data) => {
   };
 };
 
-module.exports = {
-  processarCashback
-}; 
+export { processarCashback }; 

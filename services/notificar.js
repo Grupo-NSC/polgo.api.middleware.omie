@@ -1,5 +1,5 @@
-const { logger } = require('../utils/logger');
-const retryAxios = require('../utils/retryAxios');
+import { logger } from '../utils/logger.js';
+import retryAxios from '../utils/retryAxios.js';
 
 const notificarSistema = async (data) => {
   logger.info('Enviando notificação', { data });
@@ -15,6 +15,4 @@ const notificarSistema = async (data) => {
   };
 };
 
-module.exports = {
-  notificarSistema
-}; 
+export { notificarSistema }; 
