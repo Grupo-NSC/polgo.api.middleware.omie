@@ -1,0 +1,37 @@
+{
+  "name": "polgo.api.middleware.omie",
+  "version": "1.0.0",
+  "description": "Middleware de integração do polgo.api com o OmiePDV",
+  "main": "handler.js",
+  "scripts": {
+    "dev": "serverless offline",
+    "deploy": "serverless deploy",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Grupo-NSC/polgo.api.middleware.omie.git"
+  },
+  "author": "Grupo Polgo",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Grupo-NSC/polgo.api.middleware.omie/issues"
+  },
+  "homepage": "https://github.com/Grupo-NSC/polgo.api.middleware.omie#readme",
+  "dependencies": {
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.5",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.1",
+    "serverless": "^3.38.0",
+    "serverless-offline": "^13.3.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

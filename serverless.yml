@@ -1,0 +1,28 @@
+service: polgo-api-middleware-omie
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  environment:
+    NODE_ENV: ${self:provider.stage}
+    # Adicione outras variáveis de ambiente conforme necessário
+
+functions:
+  omieWebhookHandler:
+    handler: handler.omieWebhookHandler
+    events:
+      - http:
+          path: polgo/integracao/webhook/omie
+          method: post
+          cors: true
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3000 
