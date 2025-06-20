@@ -1,10 +1,14 @@
+import dotenv from 'dotenv';
 import { logger } from './utils/logger.js';
 import initHandler from './actions/init.js';
 import dataExchangeHandler from './actions/dataExchange.js';
 
+// Load environment variables from .env file
+dotenv.config();
+
 const omieWebhookHandler = async (event) => {
   try {
-    logger.info('Recebendo webhook da Omie', { event });
+    logger.info('Recebendo webhook da Omie');
 
     const body = JSON.parse(event.body);
     const { action, data } = body;

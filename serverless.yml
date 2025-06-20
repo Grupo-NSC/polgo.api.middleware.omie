@@ -9,7 +9,24 @@ provider:
   region: ${opt:region, 'us-east-1'}
   environment:
     NODE_ENV: ${self:provider.stage}
-    # Adicione outras variáveis de ambiente conforme necessário
+    LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
+    POLGO_API_URL: ${env:POLGO_API_URL, 'https://integracaoomie.hapi.polgo.online/polgo'}
+    POLGO_AUTH_URL: ${env:POLGO_AUTH_URL, 'https://auth-dev.polgo.com.br'}
+    POLGO_WEBHOOK_URL: ${env:POLGO_WEBHOOK_URL, 'https://webhook-dev.polgo.com.br'}
+    OMIE_API_KEY: ${env:OMIE_API_KEY, ''}
+    OMIE_API_SECRET: ${env:OMIE_API_SECRET, ''}
+    OMIE_APP_KEY: ${env:OMIE_APP_KEY, ''}
+    OMIE_USUARIO: ${env:OMIE_USUARIO, 'omie'}
+    OMIE_SENHA: ${env:OMIE_SENHA, 'omiepolgo'}
+    OMIE_EMPRESA_ID: ${env:OMIE_EMPRESA_ID, 'cca39332-72c7-4f8c-b5f4-82d4944089e2'}
+    CASHBACK_VALOR: ${env:CASHBACK_VALOR, '49.99'}
+    NOTIFICATION_USUARIO: ${env:NOTIFICATION_USUARIO, '19995811172'}
+    FLOW_CAIXA_ID: ${env:FLOW_CAIXA_ID, 'cx01'}
+    MAX_RETRIES: ${env:MAX_RETRIES, '3'}
+    RETRY_DELAY: ${env:RETRY_DELAY, '1000'}
+    REQUEST_TIMEOUT: ${env:REQUEST_TIMEOUT, '5000'}
+    LAMBDA_TIMEOUT: ${env:LAMBDA_TIMEOUT, '30'}
+    CACHE_TTL: ${env:CACHE_TTL, '3600'}
 
 functions:
   omieWebhookHandler:
