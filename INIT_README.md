@@ -21,13 +21,24 @@ O handler `init.js` executa as seguintes operações em sequência:
 - **Headers**: Inclui token de autenticação obtido no passo anterior
 - **Resposta**: Extrai o CNPJ da empresa para uso nos próximos passos
 
-### 3. Cálculo de Cashback
-- **Endpoint**: `POST /fidelidade/v1/calcularCashbackCompra`
+### 3. Cálculo do Valor Máximo de Cashout
+- **Endpoint**: `POST https://testews.polgo.com.br/polgo/fidelidade/v1/calculaValorMaximoCashout`
 - **Payload**:
 ```json
 {
-  "cnpjAssociado": "CNPJ_DA_EMPRESA",
-  "valorCompra": 93.2
+  "usuario": "19995811172",
+  "cnpjAssociado": "02765150000111",
+  "valorCompra": 7
+}
+```
+- **Resposta**:
+```json
+{
+  "status": 200,
+  "mensagem": "Valor máximo de cashout calculado com sucesso!",
+  "retorno": { 
+    "valorMaximo": 3.85 
+  }
 }
 ```
 
@@ -36,19 +47,22 @@ O handler `init.js` executa as seguintes operações em sequência:
 - **Payload**:
 ```json
 {
-  "usuario": "19988887777",
-  "associadoCnpj": "CNPJ_DA_EMPRESA"
+  "usuario": "19995811172",
+  "associadoCnpj": "02765150000111"
 }
 ```
 
-### 5. Inserção de Flow
+### 5. Inserção de Flow com Valor de Cashout
 - **Endpoint**: `POST /integracao/v1/omie/flow`
 - **Payload**:
 ```json
 {
-  "idEmpresa": "abc",
-  "idCaixa": "cx01_abc123",
-  "flowToken": "token123xyz"
+  "idEmpresa": "cca39332-72c7-4f8c-b5f4-82d4944089e2",
+  "idCaixa": "cx01",
+  "flowToken": "{% uuid 'v1' %}",
+  "venda": {
+    "cashoutMaximo": 3.55
+  }
 }
 ```
 
@@ -64,7 +78,7 @@ NODE_ENV=development
 LOG_LEVEL=debug
 
 # URLs dos Serviços Polgo (já existentes)
-POLGO_API_URL=https://integracaoomie.hapi.polgo.online/polgo
+POLGO_API_URL=https://integracaoomie.hapi.polgo.online/
 
 # Credenciais Omie (já existentes)
 OMIE_API_KEY=sua_chave_api_aqui
@@ -78,6 +92,7 @@ OMIE_EMPRESA_ID=cca39332-72c7-4f8c-b5f4-82d4944089e2
 CASHBACK_VALOR=49.99
 NOTIFICATION_USUARIO=19995811172
 FLOW_CAIXA_ID=cx01
+CASHOUT_CALCULATION_URL=https://testews.polgo.com.br
 ```
 
 ### Valores Padrão
@@ -90,6 +105,7 @@ Se as variáveis de ambiente não forem definidas, os seguintes valores padrão 
 - `CASHBACK_VALOR`: `49.99`
 - `NOTIFICATION_USUARIO`: `19995811172`
 - `FLOW_CAIXA_ID`: `cx01`
+- `CASHOUT_CALCULATION_URL`: `https://testews.polgo.com.br`
 
 ## Uso
 
@@ -119,11 +135,12 @@ O handler extrai os seguintes valores da requisição:
 
 | Campo da Requisição | Uso | Fallback |
 |-------------------|-----|----------|
-| `data.ValorTotal` | Valor para cálculo de cashback | `CASHBACK_VALOR` env var |
+| `data.ValorTotal` | Valor para cálculo de cashout máximo | `CASHBACK_VALOR` env var |
 | `data.IdEmpresa` | ID da empresa para consulta | `OMIE_EMPRESA_ID` env var |
 | `data.IdCaixa` | ID do caixa para o flow | `FLOW_CAIXA_ID` env var |
 | `data.flowToken` | Token do flow | Gera novo UUID |
 | `data.NfeDestinatario.Telefone` | Telefone para notificação | `NOTIFICATION_USUARIO` env var |
+| `data.NfeDestinatario.Nome` | Nome do cliente | "Cliente" |
 
 ### Resposta de Sucesso
 
@@ -131,21 +148,10 @@ O handler extrai os seguintes valores da requisição:
 {
   "statusCode": 200,
   "body": {
-    "message": "Inicialização processada com sucesso",
+    "screen": "Cashback",
     "data": {
-      "requestData": {
-        "valorTotal": 93.2,
-        "idEmpresa": "abc",
-        "idCaixa": "cx01_abc123",
-        "flowToken": "token123xyz",
-        "telefone": "19988887777",
-        "cnpj": "94908459443041"
-      },
-      "authentication": { /* dados da autenticação */ },
-      "company": { /* dados da empresa */ },
-      "cashback": { /* dados do cashback */ },
-      "notification": { /* dados da notificação */ },
-      "flow": { /* dados do flow */ }
+      "Nome": "João Polgo",
+      "Valor": 3.85
     }
   }
 }
@@ -181,6 +187,7 @@ O handler utiliza o Winston para logging. Todos os passos são registrados com i
 - **Logging Detalhado**: Todos os erros são registrados com contexto completo
 - **Resposta Estruturada**: Erros são retornados em formato JSON padronizado
 - **Validação de CNPJ**: Verifica se o CNPJ foi extraído corretamente da resposta da empresa
+- **Validação de Cashout**: Verifica se o valor máximo de cashout foi calculado corretamente
 
 ## Dependências
 

@@ -11,7 +11,8 @@ const omieWebhookHandler = async (event) => {
     logger.info('Recebendo webhook da Omie');
 
     const body = JSON.parse(event.body);
-    const { action, data } = body;
+    const { action, data, flowToken } = body;
+    logger.info(JSON.stringify(data, null, 2));
 
     if (!action || !data) {
       throw new Error('Payload inválido: action e data são obrigatórios');
@@ -21,7 +22,7 @@ const omieWebhookHandler = async (event) => {
       case 'init':
         return await initHandler(data);
       case 'data_exchange':
-        return await dataExchangeHandler(data);
+        return await dataExchangeHandler({data, flowToken});
       default:
         throw new Error(`Ação não suportada: ${action}`);
     }

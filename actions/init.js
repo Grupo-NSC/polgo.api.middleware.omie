@@ -19,11 +19,11 @@ const initHandler = async (data) => {
   try {
     // Extract values from request data
     const valorTotal = data.ValorTotal || parseFloat(process.env.CASHBACK_VALOR) || 49.99;
-    const idEmpresa = data.IdEmpresa || process.env.OMIE_EMPRESA_ID || 'cca39332-72c7-4f8c-b5f4-82d4944089e2';
-    const idCaixa = data.IdCaixa || process.env.FLOW_CAIXA_ID || 'cx01';
+    const idEmpresa = data.IdEmpresa || process.env.OMIE_EMPRESA_ID;
+    const idCaixa = data.IdCaixa || process.env.FLOW_CAIXA_ID;
     const flowToken = data.flowToken || uuidv4();
-    const telefone = data.NfeDestinatario?.Telefone || process.env.NOTIFICATION_USUARIO || '19995811172';
-    const nome = data.NfeDestinatario?.Nome || 'Cliente';
+    const telefone = data.NfeDestinatario?.Telefone;
+    const nome = data.NfeDestinatario?.Nome || 'SEM_NOME';
     
     logger.info('Valores extraídos da requisição', {
       valorTotal,
@@ -37,9 +37,7 @@ const initHandler = async (data) => {
     // Step 1: Authenticate with Omie
     logger.info(
       'Step 1: Autenticando com Omie'
-    );
-
-    console.log(`${process.env.POLGO_API_URL}/login/v1/autenticacao`);   
+    ); 
 
     const authResponse = await retryAxios({
       method: 'POST',
@@ -48,8 +46,8 @@ const initHandler = async (data) => {
         'Content-Type': 'application/json'
       },
       data: {
-        usuario: process.env.OMIE_USUARIO || "omie",
-        senha: process.env.OMIE_SENHA || "omiepolgo"
+        usuario: process.env.OMIE_USUARIO,
+        senha: process.env.OMIE_SENHA
       }
     });
     
@@ -82,29 +80,30 @@ const initHandler = async (data) => {
     
     logger.info('CNPJ extraído da empresa', { cnpj });
 
-    // Step 3: Calculate cashback
-    logger.info('Step 3: Calculando cashback');
-    const cashbackResponse = await retryAxios({
+    // Step 3: Calculate maximum cashout value
+    logger.info('Step 3: Calculando valor máximo de cashout');
+    const cashoutResponse = await retryAxios({
       method: 'POST',
-      url: `${process.env.POLGO_API_URL}/fidelidade/v1/calcularCashbackCompra`,
+      url: `${process.env.POLGO_API_URL}/fidelidade/v1/calculaValorMaximoCashout`,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authResponse.data.retorno.token}`
       },
       data: {
+        usuario: telefone,
         cnpjAssociado: cnpj,
         valorCompra: valorTotal
       }
     });
     
-    logger.info('Cashback calculado com sucesso', { 
-      status: cashbackResponse.status,
-      data: cashbackResponse.data 
+    logger.info('Valor máximo de cashout calculado com sucesso', { 
+      status: cashoutResponse.status,
+      data: cashoutResponse.data 
     });
 
-    // Extract cashback value from response
-    const cashbackGerado = cashbackResponse.data?.retorno?.cashbackGerado || 0;
-    logger.info('Valor do cashback extraído', { cashbackGerado });
+    // Extract cashout maximum value from response
+    const cashoutMaximo = cashoutResponse.data?.retorno?.valorMaximo || 0;
+    logger.info('Valor máximo de cashout extraído', { cashoutMaximo });
 
     // Step 4: Send temporary authentication notification
     logger.info('Step 4: Enviando notificação de autenticação temporária');
@@ -126,8 +125,8 @@ const initHandler = async (data) => {
       data: notificationResponse.data 
     });
 
-    // Step 5: Insert flow
-    logger.info('Step 5: Inserindo flow');
+    // Step 5: Insert flow with cashout maximum value
+    logger.info('Step 5: Inserindo flow com valor máximo de cashout');
     const flowResponse = await retryAxios({
       method: 'POST',
       url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow`,
@@ -138,14 +137,20 @@ const initHandler = async (data) => {
       data: {
         idEmpresa: idEmpresa,
         idCaixa: idCaixa,
-        flowToken: flowToken
+        flowToken: flowToken,
+        venda: {
+          valor: valorTotal,
+          cashoutMaximo: cashoutMaximo,
+          usuario: telefone,
+        }
       }
     });
     
     logger.info('Flow inserido com sucesso', { 
       status: flowResponse.status,
       data: flowResponse.data,
-      flowToken: flowToken
+      flowToken: flowToken,
+      cashoutMaximo: cashoutMaximo
     });
 
     // Return success response in the expected format
@@ -155,7 +160,7 @@ const initHandler = async (data) => {
         screen: "Cashback",
         data: {
           Nome: nome,
-          Valor: cashbackGerado
+          Valor: cashoutMaximo
         }
       })
     };
