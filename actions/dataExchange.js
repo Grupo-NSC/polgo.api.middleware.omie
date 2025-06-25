@@ -173,7 +173,7 @@ const dataExchangeHandler = async ({data, flowToken}) => {
         Id: flowToken,
         EmpresaId: idEmpresa, // Use idEmpresa from flow response
         CaixaId: idCaixa, // Use idCaixa from flow response
-        Valor: 0.01
+        Valor: cashoutMaximo
       }
     });
     
