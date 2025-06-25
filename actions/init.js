@@ -21,8 +21,8 @@ const initHandler = async (data) => {
     const valorTotal = data.ValorTotal || parseFloat(process.env.CASHBACK_VALOR) || 49.99;
     const idEmpresa = data.IdEmpresa || process.env.OMIE_EMPRESA_ID;
     const idCaixa = data.IdCaixa || process.env.FLOW_CAIXA_ID;
-    const flowToken = data.flowToken || uuidv4();
-    const telefone = data.NfeDestinatario?.Telefone;
+    const flowToken = data.FlowToken || uuidv4();
+    const telefone = data.NfeDestinatario?.Telefone?.replace(/[()\-\s]/g, '') || '';
     const nome = data.NfeDestinatario?.Nome || 'SEM_NOME';
     
     logger.info('Valores extraídos da requisição', {
@@ -153,6 +153,18 @@ const initHandler = async (data) => {
       cashoutMaximo: cashoutMaximo
     });
 
+
+    logger.info('--- Resposta do flow', {
+      statusCode: 200,
+      body: JSON.stringify({
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo
+        }
+      })
+    });
+    
     // Return success response in the expected format
     return {
       statusCode: 200,
