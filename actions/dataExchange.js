@@ -164,21 +164,32 @@ const dataExchangeHandler = async ({data, flowToken}) => {
       method: 'POST',
       url: `${process.env.DISCOUNT_API_URL}/api/CupomVenda/AplicarPagamento`,
       headers: {
-        'AppKey': '5d90522b-eceb-4353-a176-fbcef8a728d5',
-        'AppSecret': 'LF5GMDtCVm021kH7BBsP7Uzx5ZO0X2kktkF7rvEPeWc+miiYJZJE6Y8EuwcPjECesBzlhdsWteBsZpAqX6ufGjDt/+nu9Ev75Cx8qEbnF640xlGkRDGUel8UfUUd/FHx91vKIGCFfaDQ4Jg5g7YcGcYKnofcC/YHfdLskTqiXxo=',
+        AppKey: '5d90522b-eceb-4353-a176-fbcef8a728d5',
+        AppSecret:
+          'LF5GMDtCVm021kH7BBsP7Uzx5ZO0X2kktkF7rvEPeWc+miiYJZJE6Y8EuwcPjECesBzlhdsWteBsZpAqX6ufGjDt/+nu9Ev75Cx8qEbnF640xlGkRDGUel8UfUUd/FHx91vKIGCFfaDQ4Jg5g7YcGcYKnofcC/YHfdLskTqiXxo=',
         'Content-Type': 'application/json'
       },
       data: {
         Id: flowToken,
         EmpresaId: idEmpresa, // Use idEmpresa from flow response
         CaixaId: idCaixa, // Use idCaixa from flow response
-        Valor: 10.00
+        Valor: 0.01
       }
     });
     
     logger.info('Desconto aplicado com sucesso', { 
       status: discountResponse.status,
       data: discountResponse.data 
+    });
+
+    logger.info('--- Resposta do desconto', {
+      statusCode: 200,
+      body: JSON.stringify({
+        screen: 'Confirmacao',
+        data: {
+          Mensagem: 'Cashback realizado com sucesso'
+        }
+      })
     });
 
     // Return success response
