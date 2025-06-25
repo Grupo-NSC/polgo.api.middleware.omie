@@ -1,10 +1,9 @@
 import { logger } from '../utils/logger.js';
 import retryAxios from '../utils/retryAxios.js';
-import { v4 as uuidv4 } from 'uuid';
 
-const initHandler = async (data) => {
+const initHandler = async ({ data, flowToken }) => {
   logger.info('Iniciando processo de inicialização');
-  
+
   // Debug environment variables
   logger.info('Environment variables debug', {
     POLGO_API_URL: process.env.POLGO_API_URL,
@@ -15,29 +14,29 @@ const initHandler = async (data) => {
     NOTIFICATION_USUARIO: process.env.NOTIFICATION_USUARIO,
     FLOW_CAIXA_ID: process.env.FLOW_CAIXA_ID
   });
-  
+
   try {
     // Extract values from request data
-    const valorTotal = data.ValorTotal || parseFloat(process.env.CASHBACK_VALOR) || 49.99;
+    const valorTotal =
+      data.ValorTotal || parseFloat(process.env.CASHBACK_VALOR) || 49.99;
     const idEmpresa = data.IdEmpresa || process.env.OMIE_EMPRESA_ID;
     const idCaixa = data.IdCaixa || process.env.FLOW_CAIXA_ID;
-    const flowToken = data.FlowToken || uuidv4();
-    const telefone = data.NfeDestinatario?.Telefone?.replace(/[()\-\s]/g, '') || '';
+    const flowT = flowToken || data.FlowToken;
+    const telefone =
+      data.NfeDestinatario?.Telefone?.replace(/[()\-\s]/g, '') || '';
     const nome = data.NfeDestinatario?.Nome || 'SEM_NOME';
-    
+
     logger.info('Valores extraídos da requisição', {
       valorTotal,
       idEmpresa,
       idCaixa,
-      flowToken,
+      flowToken: flowT,
       telefone,
       nome
     });
 
     // Step 1: Authenticate with Omie
-    logger.info(
-      'Step 1: Autenticando com Omie'
-    ); 
+    logger.info('Step 1: Autenticando com Omie');
 
     const authResponse = await retryAxios({
       method: 'POST',
@@ -50,10 +49,10 @@ const initHandler = async (data) => {
         senha: process.env.OMIE_SENHA
       }
     });
-    
-    logger.info('Autenticação realizada com sucesso', { 
+
+    logger.info('Autenticação realizada com sucesso', {
       status: authResponse.status,
-      data: authResponse.data 
+      data: authResponse.data
     });
 
     // Step 2: Get company data
@@ -63,13 +62,13 @@ const initHandler = async (data) => {
       url: `${process.env.POLGO_API_URL}/integracao/v1/omie/empresa/${idEmpresa}`,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authResponse.data.retorno.token}`
+        Authorization: `Bearer ${authResponse.data.retorno.token}`
       }
     });
-    
-    logger.info('Dados da empresa obtidos com sucesso', { 
+
+    logger.info('Dados da empresa obtidos com sucesso', {
       status: companyResponse.status,
-      data: companyResponse.data 
+      data: companyResponse.data
     });
 
     // Extract CNPJ from company response
@@ -77,7 +76,7 @@ const initHandler = async (data) => {
     if (!cnpj) {
       throw new Error('CNPJ não encontrado na resposta da empresa');
     }
-    
+
     logger.info('CNPJ extraído da empresa', { cnpj });
 
     // Step 3: Calculate maximum cashout value
@@ -87,7 +86,7 @@ const initHandler = async (data) => {
       url: `${process.env.POLGO_API_URL}/fidelidade/v1/calculaValorMaximoCashout`,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authResponse.data.retorno.token}`
+        Authorization: `Bearer ${authResponse.data.retorno.token}`
       },
       data: {
         usuario: telefone,
@@ -95,10 +94,10 @@ const initHandler = async (data) => {
         valorCompra: valorTotal
       }
     });
-    
-    logger.info('Valor máximo de cashout calculado com sucesso', { 
+
+    logger.info('Valor máximo de cashout calculado com sucesso', {
       status: cashoutResponse.status,
-      data: cashoutResponse.data 
+      data: cashoutResponse.data
     });
 
     // Extract cashout maximum value from response
@@ -112,17 +111,17 @@ const initHandler = async (data) => {
       url: `${process.env.POLGO_API_URL}/login/v1/autenticacaoTemporaria/enviarNotificacaoToken`,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authResponse.data.retorno.token}`
+        Authorization: `Bearer ${authResponse.data.retorno.token}`
       },
       data: {
         usuario: telefone,
         associadoCnpj: cnpj
       }
     });
-    
-    logger.info('Notificação enviada com sucesso', { 
+
+    logger.info('Notificação enviada com sucesso', {
       status: notificationResponse.status,
-      data: notificationResponse.data 
+      data: notificationResponse.data
     });
 
     // Step 5: Insert flow with cashout maximum value
@@ -132,27 +131,26 @@ const initHandler = async (data) => {
       url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow`,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authResponse.data.retorno.token}`
+        Authorization: `Bearer ${authResponse.data.retorno.token}`
       },
       data: {
         idEmpresa: idEmpresa,
         idCaixa: idCaixa,
-        flowToken: flowToken,
+        flowToken: flowT,
         venda: {
           valor: valorTotal,
           cashoutMaximo: cashoutMaximo,
-          usuario: telefone,
+          usuario: telefone
         }
       }
     });
-    
-    logger.info('Flow inserido com sucesso', { 
+
+    logger.info('Flow inserido com sucesso', {
       status: flowResponse.status,
       data: flowResponse.data,
-      flowToken: flowToken,
+      flowToken: flowT,
       cashoutMaximo: cashoutMaximo
     });
-
 
     logger.info('--- Resposta do flow', {
       statusCode: 200,
@@ -164,26 +162,25 @@ const initHandler = async (data) => {
         }
       })
     });
-    
+
     // Return success response in the expected format
     return {
       statusCode: 200,
       body: JSON.stringify({
-        screen: "Cashback",
+        screen: 'Cashback',
         data: {
           Nome: nome,
           Valor: cashoutMaximo
         }
       })
     };
-
   } catch (error) {
-    logger.error('Erro durante a etapa init', { 
+    logger.error('Erro durante a etapa init', {
       error: error.message,
       stack: error.stack,
       response: error.response?.data
     });
-    
+
     return {
       statusCode: 500,
       body: JSON.stringify({

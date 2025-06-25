@@ -20,7 +20,7 @@ const omieWebhookHandler = async (event) => {
 
     switch (Action) {
       case 'init':
-        return await initHandler(Data);
+        return await initHandler({ data: Data, flowToken: FlowToken });
       case 'data_exchange':
         return await dataExchangeHandler({ data: Data, flowToken: FlowToken });
       default:

@@ -2,12 +2,12 @@ import { logger } from '../utils/logger.js';
 import retryAxios from '../utils/retryAxios.js';
 
 const dataExchangeHandler = async ({data, flowToken}) => {
-  logger.info('Processando ação data_exchange', { data });
+  logger.info('Processando ação data_exchange', { data, flowToken });
   
   try {
     // Extract values from request data
     const voucher = data.Voucher;
-    const flowT = data.flowToken || flowToken;
+    const flowT = flowToken || data.FlowToken;
     
     if (!voucher || !flowT) {
       throw new Error('Voucher e flowToken são obrigatórios');
