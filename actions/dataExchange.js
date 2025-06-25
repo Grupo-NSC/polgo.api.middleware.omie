@@ -184,18 +184,18 @@ const dataExchangeHandler = async ({data, flowToken}) => {
 
     logger.info('--- Resposta do desconto', {
       statusCode: 200,
-      body: JSON.stringify({
+      body: {
         screen: 'Confirmacao',
         data: {
           Mensagem: 'Cashback realizado com sucesso'
         }
-      })
+      }
     });
 
     // Return success response
     return {
       statusCode: 200,
-      body: JSON.stringify({
+      body: {
         message: 'Data exchange processado com sucesso',
         data: {
           screen: "Confirmacao",
@@ -203,7 +203,7 @@ const dataExchangeHandler = async ({data, flowToken}) => {
             Mensagem: "Cashback realizado com sucesso",
           }
         }
-      })
+      }
     };
 
   } catch (error) {
@@ -215,11 +215,11 @@ const dataExchangeHandler = async ({data, flowToken}) => {
     
     return {
       statusCode: 500,
-      body: JSON.stringify({
+      body: {
         message: 'Erro durante a etapa data_exchange',
         error: error.message,
         details: error.response?.data || null
-      })
+      }
     };
   }
 };
