@@ -154,25 +154,25 @@ const initHandler = async ({ data, flowToken }) => {
 
     logger.info('--- Resposta do flow', {
       statusCode: 200,
-      body: {
+      body: JSON.stringify({
         screen: 'Cashback',
         data: {
           Nome: nome,
           Valor: cashoutMaximo
         }
-      },
+      })
     });
 
     // Return success response in the expected format
     return {
       statusCode: 200,
-      body: {
+      body: JSON.stringify({
         screen: 'Cashback',
         data: {
           Nome: nome,
           Valor: cashoutMaximo
         }
-      }
+      })
     };
   } catch (error) {
     logger.error('Erro durante a etapa init', {
@@ -183,11 +183,11 @@ const initHandler = async ({ data, flowToken }) => {
 
     return {
       statusCode: 500,
-      body: {
+      body: JSON.stringify({
         message: 'Erro durante a etapa init',
         error: error.message,
         details: error.response?.data || null
-      }
+      })
     };
   }
 };
