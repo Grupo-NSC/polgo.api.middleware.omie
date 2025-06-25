@@ -160,26 +160,26 @@ const dataExchangeHandler = async ({data, flowToken}) => {
 
     // Step 6: Apply discount
     logger.info('Step 6: Aplicando desconto');
-    // const discountResponse = await retryAxios({
-    //   method: 'POST',
-    //   url: `${process.env.DISCOUNT_API_URL}/api/CupomVenda/AplicarPagamento`,
-    //   headers: {
-    //     'AppKey': process.env.DISCOUNT_APP_KEY || '5d90522b-eceb-4353-a176-fbcef8a728d5',
-    //     'AppSecret': process.env.DISCOUNT_APP_SECRET || 'LF5GMDtCVm021kH7BBsP7Uzx5ZO0X2kktkF7rvEPeWc+miiYJZJE6Y8EuwcPjECesBzlhdsWteBsZpAqX6ufGjDt/+nu9Ev75Cx8qEbnF640xlGkRDGUel8UfUUd/FHx91vKIGCFfaDQ4Jg5g7YcGcYKnofcC/YHfdLskTqiXxo=',
-    //     'Content-Type': 'application/json'
-    //   },
-    //   data: {
-    //     Id: flowToken,
-    //     EmpresaId: idEmpresa, // Use idEmpresa from flow response
-    //     CaixaId: idCaixa, // Use idCaixa from flow response
-    //     Valor: parseFloat(process.env.DISCOUNT_VALOR) || 10.00
-    //   }
-    // });
+    const discountResponse = await retryAxios({
+      method: 'POST',
+      url: `${process.env.DISCOUNT_API_URL}/api/CupomVenda/AplicarPagamento`,
+      headers: {
+        'AppKey': '5d90522b-eceb-4353-a176-fbcef8a728d5',
+        'AppSecret': 'LF5GMDtCVm021kH7BBsP7Uzx5ZO0X2kktkF7rvEPeWc+miiYJZJE6Y8EuwcPjECesBzlhdsWteBsZpAqX6ufGjDt/+nu9Ev75Cx8qEbnF640xlGkRDGUel8UfUUd/FHx91vKIGCFfaDQ4Jg5g7YcGcYKnofcC/YHfdLskTqiXxo=',
+        'Content-Type': 'application/json'
+      },
+      data: {
+        Id: flowToken,
+        EmpresaId: idEmpresa, // Use idEmpresa from flow response
+        CaixaId: idCaixa, // Use idCaixa from flow response
+        Valor: 10.00
+      }
+    });
     
-    // logger.info('Desconto aplicado com sucesso', { 
-    //   status: discountResponse.status,
-    //   data: discountResponse.data 
-    // });
+    logger.info('Desconto aplicado com sucesso', { 
+      status: discountResponse.status,
+      data: discountResponse.data 
+    });
 
     // Return success response
     return {

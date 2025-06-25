@@ -12,7 +12,7 @@ const omieWebhookHandler = async (event) => {
 
     const body = JSON.parse(event.body);
     const { action, data, flowToken } = body;
-    logger.info(JSON.stringify(data, null, 2));
+    logger.info("--- data -->", data);
 
     if (!action || !data) {
       throw new Error('Payload inválido: action e data são obrigatórios');
