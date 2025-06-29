@@ -1,8 +1,24 @@
 import { logger } from '../utils/logger.js';
-import retryAxios from '../utils/retryAxios.js';
+import { 
+  autenticarComOmie,
+  verificarDadosFlow,
+  verificarTokenTemporario,
+  obterDadosEmpresa,
+  processarCashout,
+  aplicarPagamento,
+  cancelarCashout
+} from '../services/index.js';
 
-const dataExchangeHandler = async ({data, flowToken}) => {
+const dataExchangeHandler = async ({ data, flowToken }) => {
   logger.info('Processando ação data_exchange', { data, flowToken });
+
+  let idEmpresa = null;
+  let idCaixa = null;
+  let cashoutMaximo = 0;
+  let usuario = null;
+  let nome = "USUÁRIO";
+  let valorCompra = 0;
+  let cashoutCodigoControle = null; // Para armazenar o código de controle do cashout
   
   try {
     // Extract values from request data
@@ -20,167 +36,144 @@ const dataExchangeHandler = async ({data, flowToken}) => {
 
     // Step 1: Authenticate with Omie
     logger.info('Step 1: Autenticando com Omie');
-    const authResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.POLGO_API_URL}/login/v1/autenticacao`,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      data: {
-        usuario: process.env.OMIE_USUARIO,
-        senha: process.env.OMIE_SENHA
-      }
-    });
-    
-    logger.info('Autenticação realizada com sucesso', { 
-      status: authResponse.status,
-      data: authResponse.data 
-    });
+    const authResult = await autenticarComOmie();
+    if (!authResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
+          }
+        })
+      };
+    }
+    const authToken = authResult.dados.token;
 
     // Step 2: Check for flow data
     logger.info('Step 2: Verificando dados do flow');
-    const flowCheckResponse = await retryAxios({
-      method: 'GET',
-      url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow/${flowT}`,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authResponse.data.retorno.token}`
-      }
-    });
-    
-    logger.info('Dados do flow verificados com sucesso', { 
-      status: flowCheckResponse.status,
-      data: flowCheckResponse.data 
-    });
-
-    // Verify flow data exists
-    const flowCheckData = flowCheckResponse.data?.retorno;
-    if (!flowCheckData) {
-      throw new Error('Dados do flow não encontrados');
+    const flowResult = await verificarDadosFlow(flowT, authToken);
+    if (!flowResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro ao verificar flow: ' + flowResult.erro.mensagem
+          }
+        })
+      };
     }
     
-    const idEmpresa = flowCheckData.idEmpresa;
-    const idCaixa = flowCheckData.idCaixa;
-    const cashoutMaximo =
-      flowCheckData.venda?.cashoutMaximo ||
-      parseFloat(process.env.CASHOUT_VALOR) ||
-      0;
-    const usuario = flowCheckData.venda?.usuario;
-    const valorCompra = flowCheckData.venda?.valor;
+    idEmpresa = flowResult.dados.idEmpresa;
+    idCaixa = flowResult.dados.idCaixa;
+    cashoutMaximo = flowResult.dados.cashoutMaximo;
+    usuario = flowResult.dados.usuario;
+    nome = flowResult.dados.nome;
+    valorCompra = flowResult.dados.valorCompra;
 
     logger.info('Dados do flow extraídos', {
       idEmpresa,
       idCaixa,
       cashoutMaximo,
       usuario,
-      valorCompra
+      valorCompra,
+      nome
     });
 
     // Step 3: Verify if temporary token is valid
     logger.info('Step 3: Verificando token temporário');
-    const verifyResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.POLGO_API_URL}/login/v1/autenticacaoTemporaria/verificar`,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authResponse.data.retorno.token}`
-      },
-      data: {
-        usuario: usuario,
-        codigo: voucher.toString()
-      }
-    });
-    
-    logger.info('Verificação de token realizada com sucesso', { 
-      status: verifyResponse.status,
-      data: verifyResponse.data 
-    });
-
-    // Check if code is valid
-    const codigoValido = verifyResponse.data?.retorno?.codigoValido;
-    if (!codigoValido) {
-      throw new Error('Código temporário inválido');
+    const tokenResult = await verificarTokenTemporario(usuario, voucher, authToken);
+    if (!tokenResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro na verificação do token: ' + tokenResult.erro.mensagem
+          }
+        })
+      };
     }
 
     // Step 4: Get CNPJ from company
     logger.info('Step 4: Obtendo CNPJ da empresa');
-    const companyResponse = await retryAxios({
-      method: 'GET',
-      url: `${process.env.POLGO_API_URL}/integracao/v1/omie/empresa/${idEmpresa}`,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authResponse.data.retorno.token}`
-      }
-    });
-    
-    logger.info('CNPJ da empresa obtido com sucesso', { 
-      status: companyResponse.status,
-      data: companyResponse.data 
-    });
-
-    // Extract CNPJ from company response
-    const cnpj = companyResponse.data?.retorno?.cnpj;
-    if (!cnpj) {
-      throw new Error('CNPJ não encontrado na resposta da empresa');
+    const empresaResult = await obterDadosEmpresa(idEmpresa, authToken);
+    if (!empresaResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+          }
+        })
+      };
     }
-    
-    logger.info('CNPJ extraído da empresa', { cnpj });
+    const { cnpj, appSecret, appKey } = empresaResult.dados;
 
     // Step 5: Cashout operation
     logger.info('Step 5: Realizando operação de cashout');
-    const cashoutResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.CASHOUT_API_URL}/cashback/v1/cashout/${usuario}`,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authResponse.data.retorno.token}`
-      },
-      data: {
-        valor: cashoutMaximo,
-        associado: cnpj,
-        colaborador: '',
-        nomeColaborador: null,
-        codigoControle: null,
-        descricao: `Origem: Middleware OMIE - Cashout: R$${cashoutMaximo}`,
-        valorTotalCompra: valorCompra,
-        imagemDebito: null
-      }
-    });
-    
-    logger.info('Cashout realizado com sucesso', { 
-      status: cashoutResponse.status,
-      data: cashoutResponse.data 
-    });
-
-    // Extract cashout data
-    const cashoutData = cashoutResponse.data?.retorno;
-    if (!cashoutData) {
-      throw new Error('Dados de cashout não encontrados na resposta');
+    const cashoutResult = await processarCashout(usuario, cashoutMaximo, cnpj, valorCompra, authToken);
+    if (!cashoutResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro no processamento de cashout: ' + cashoutResult.erro.mensagem
+          }
+        })
+      };
     }
+    
+    // Armazenar o código de controle do cashout para possível cancelamento
+    cashoutCodigoControle = cashoutResult.dados.codigoControle;
+    logger.info('Código de controle do cashout armazenado', { cashoutCodigoControle });
 
     // Step 6: Apply discount
     logger.info('Step 6: Aplicando desconto');
-    const discountResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.DISCOUNT_API_URL}/api/CupomVenda/AplicarPagamento`,
-      headers: {
-        AppKey: '5d90522b-eceb-4353-a176-fbcef8a728d5',
-        AppSecret:
-          'LF5GMDtCVm021kH7BBsP7Uzx5ZO0X2kktkF7rvEPeWc+miiYJZJE6Y8EuwcPjECesBzlhdsWteBsZpAqX6ufGjDt/+nu9Ev75Cx8qEbnF640xlGkRDGUel8UfUUd/FHx91vKIGCFfaDQ4Jg5g7YcGcYKnofcC/YHfdLskTqiXxo=',
-        'Content-Type': 'application/json'
-      },
-      data: {
-        Id: flowToken,
-        EmpresaId: idEmpresa, // Use idEmpresa from flow response
-        CaixaId: idCaixa, // Use idCaixa from flow response
-        Valor: cashoutMaximo
+    const pagamentoResult = await aplicarPagamento(flowT, idEmpresa, idCaixa, cashoutMaximo, appKey, appSecret);
+    if (!pagamentoResult.sucesso) {
+      // Se a aplicação do desconto falhar, cancelar o cashout automaticamente
+      logger.warn('Falha na aplicação do desconto, cancelando cashout automaticamente', {
+        codigoControle: cashoutCodigoControle,
+        cnpj: cnpj,
+        usuario: usuario
+      });
+      
+      const cancelamentoResult = await cancelarCashout(cashoutCodigoControle, cnpj, usuario, authToken);
+      if (!cancelamentoResult.sucesso) {
+        logger.error('Erro ao cancelar cashout após falha no desconto', {
+          erro: cancelamentoResult.erro
+        });
+        // Mesmo que o cancelamento falhe, retornamos o erro original do desconto
+      } else {
+        logger.info('Cashout cancelado com sucesso após falha no desconto');
       }
-    });
-    
-    logger.info('Desconto aplicado com sucesso', { 
-      status: discountResponse.status,
-      data: discountResponse.data 
-    });
+      
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Não foi possível aplicar o desconto no pedido. Cashout foi cancelado automaticamente.'
+          }
+        })
+      };
+    }
 
     logger.info('--- Resposta do desconto', {
       statusCode: 200,
@@ -209,16 +202,36 @@ const dataExchangeHandler = async ({data, flowToken}) => {
   } catch (error) {
     logger.error('Erro durante a etapa data_exchange', { 
       error: error.message,
-      stack: error.stack,
       response: error.response?.data
     });
     
+    // Se houve erro geral e temos um cashout realizado, tentar cancelar
+    if (cashoutCodigoControle) {
+      logger.warn('Erro geral detectado, tentando cancelar cashout', {
+        codigoControle: cashoutCodigoControle
+      });
+      
+      try {
+        // Precisamos do authToken e dados da empresa para cancelar
+        // Como não temos acesso direto aqui, vamos apenas logar
+        logger.error('Não foi possível cancelar cashout automaticamente devido ao erro geral', {
+          codigoControle: cashoutCodigoControle,
+          erro: error.message
+        });
+      } catch (cancelError) {
+        logger.error('Erro ao tentar cancelar cashout', { cancelError });
+      }
+    }
+    
     return {
-      statusCode: 500,
+      statusCode: 400,
       body: JSON.stringify({
-        message: 'Erro durante a etapa data_exchange',
-        error: error.message,
-        details: error.response?.data || null
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: error.response?.data?.mensagem || error.message
+        }
       })
     };
   }

@@ -1,26 +1,21 @@
 import { logger } from '../utils/logger.js';
-import retryAxios from '../utils/retryAxios.js';
+import { 
+  autenticarComOmie,
+  obterDadosEmpresa,
+  calcularCashoutMaximo,
+  enviarNotificacaoToken,
+  inserirFlow
+} from '../services/index.js';
 
 const initHandler = async ({ data, flowToken }) => {
   logger.info('Iniciando processo de inicialização');
 
-  // Debug environment variables
-  logger.info('Environment variables debug', {
-    POLGO_API_URL: process.env.POLGO_API_URL,
-    OMIE_USUARIO: process.env.OMIE_USUARIO,
-    OMIE_SENHA: process.env.OMIE_SENHA,
-    OMIE_EMPRESA_ID: process.env.OMIE_EMPRESA_ID,
-    CASHBACK_VALOR: process.env.CASHBACK_VALOR,
-    NOTIFICATION_USUARIO: process.env.NOTIFICATION_USUARIO,
-    FLOW_CAIXA_ID: process.env.FLOW_CAIXA_ID
-  });
-
   try {
     // Extract values from request data
     const valorTotal =
-      data.ValorTotal || parseFloat(process.env.CASHBACK_VALOR) || 49.99;
-    const idEmpresa = data.IdEmpresa || process.env.OMIE_EMPRESA_ID;
-    const idCaixa = data.IdCaixa || process.env.FLOW_CAIXA_ID;
+      data.ValorTotal;
+    const idEmpresa = data.IdEmpresa;
+    const idCaixa = data.IdCaixa;
     const flowT = flowToken || data.FlowToken;
     const telefone =
       data.NfeDestinatario?.Telefone?.replace(/[()\-\s]/g, '') || '';
@@ -37,120 +32,93 @@ const initHandler = async ({ data, flowToken }) => {
 
     // Step 1: Authenticate with Omie
     logger.info('Step 1: Autenticando com Omie');
-
-    const authResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.POLGO_API_URL}/login/v1/autenticacao`,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      data: {
-        usuario: process.env.OMIE_USUARIO,
-        senha: process.env.OMIE_SENHA
-      }
-    });
-
-    logger.info('Autenticação realizada com sucesso', {
-      status: authResponse.status,
-      data: authResponse.data
-    });
+    const authResult = await autenticarComOmie();
+    if (!authResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: 0,
+            MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
+          }
+        })
+      };
+    }
+    const authToken = authResult.dados.token;
 
     // Step 2: Get company data
     logger.info('Step 2: Obtendo dados da empresa');
-    const companyResponse = await retryAxios({
-      method: 'GET',
-      url: `${process.env.POLGO_API_URL}/integracao/v1/omie/empresa/${idEmpresa}`,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authResponse.data.retorno.token}`
-      }
-    });
-
-    logger.info('Dados da empresa obtidos com sucesso', {
-      status: companyResponse.status,
-      data: companyResponse.data
-    });
-
-    // Extract CNPJ from company response
-    const cnpj = companyResponse.data?.retorno?.cnpj;
-    if (!cnpj) {
-      throw new Error('CNPJ não encontrado na resposta da empresa');
+    const empresaResult = await obterDadosEmpresa(idEmpresa, authToken);
+    if (!empresaResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: 0,
+            MensagemDeErro: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+          }
+        })
+      };
     }
+    const { cnpj } = empresaResult.dados;
 
     logger.info('CNPJ extraído da empresa', { cnpj });
 
     // Step 3: Calculate maximum cashout value
     logger.info('Step 3: Calculando valor máximo de cashout');
-    const cashoutResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.POLGO_API_URL}/fidelidade/v1/calculaValorMaximoCashout`,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authResponse.data.retorno.token}`
-      },
-      data: {
-        usuario: telefone,
-        cnpjAssociado: cnpj,
-        valorCompra: valorTotal
-      }
-    });
-
-    logger.info('Valor máximo de cashout calculado com sucesso', {
-      status: cashoutResponse.status,
-      data: cashoutResponse.data
-    });
-
-    // Extract cashout maximum value from response
-    const cashoutMaximo = cashoutResponse.data?.retorno?.valorMaximo || 0;
-    logger.info('Valor máximo de cashout extraído', { cashoutMaximo });
+    const cashoutResult = await calcularCashoutMaximo(telefone, cnpj, valorTotal, authToken);
+    if (!cashoutResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: 0,
+            MensagemDeErro: 'Erro ao calcular cashout: ' + cashoutResult.erro.mensagem
+          }
+        })
+      };
+    }
+    const cashoutMaximo = cashoutResult.dados.valorMaximo;
 
     // Step 4: Send temporary authentication notification
     logger.info('Step 4: Enviando notificação de autenticação temporária');
-    const notificationResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.POLGO_API_URL}/login/v1/autenticacaoTemporaria/enviarNotificacaoToken`,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authResponse.data.retorno.token}`
-      },
-      data: {
-        usuario: telefone,
-        associadoCnpj: cnpj
-      }
-    });
-
-    logger.info('Notificação enviada com sucesso', {
-      status: notificationResponse.status,
-      data: notificationResponse.data
-    });
+    const notificacaoResult = await enviarNotificacaoToken(telefone, cnpj, authToken);
+    if (!notificacaoResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro ao enviar notificação: ' + notificacaoResult.erro.mensagem
+          }
+        })
+      };
+    }
 
     // Step 5: Insert flow with cashout maximum value
     logger.info('Step 5: Inserindo flow com valor máximo de cashout');
-    const flowResponse = await retryAxios({
-      method: 'POST',
-      url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow`,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authResponse.data.retorno.token}`
-      },
-      data: {
-        idEmpresa: idEmpresa,
-        idCaixa: idCaixa,
-        flowToken: flowT,
-        venda: {
-          valor: valorTotal,
-          cashoutMaximo: cashoutMaximo,
-          usuario: telefone
-        }
-      }
-    });
-
-    logger.info('Flow inserido com sucesso', {
-      status: flowResponse.status,
-      data: flowResponse.data,
-      flowToken: flowT,
-      cashoutMaximo: cashoutMaximo
-    });
+    const flowResult = await inserirFlow(idEmpresa, idCaixa, flowT, valorTotal, cashoutMaximo, telefone, nome, authToken);
+    if (!flowResult.sucesso) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({
+          screen: 'Cashback',
+          data: {
+            Nome: nome,
+            Valor: cashoutMaximo,
+            MensagemDeErro: 'Erro ao inserir flow: ' + flowResult.erro.mensagem
+          }
+        })
+      };
+    }
 
     logger.info('--- Resposta do flow', {
       statusCode: 200,
@@ -176,17 +144,22 @@ const initHandler = async ({ data, flowToken }) => {
     };
   } catch (error) {
     logger.error('Erro durante a etapa init', {
+      statusCode: error.statusCode,
+      body: error.body,
       error: error.message,
       stack: error.stack,
       response: error.response?.data
     });
 
     return {
-      statusCode: 500,
+      statusCode: 400,
       body: JSON.stringify({
-        message: 'Erro durante a etapa init',
-        error: error.message,
-        details: error.response?.data || null
+        screen: 'Cashback',
+        data: {
+          Nome: "USUÁRIO",
+          Valor: 0,
+          MensagemDeErro: error.message
+        }
       })
     };
   }
