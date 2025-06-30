@@ -13,7 +13,7 @@ const enviarNotificacaoToken = async (telefone, cnpj, authToken) => {
       url: `${process.env.POLGO_API_URL}/login/v1/autenticacaoTemporaria/enviarNotificacaoToken`,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`
+        Authorization: `${authToken}`
       },
       data: {
         usuario: telefone,

@@ -10,7 +10,7 @@ const obterDadosEmpresa = async (idEmpresa, authToken) => {
       url: `${process.env.POLGO_API_URL}/integracao/v1/omie/empresa/${idEmpresa}`,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `${authToken}`
       }
     });
     

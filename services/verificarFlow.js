@@ -10,7 +10,7 @@ const verificarDadosFlow = async (flowToken, authToken) => {
       url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow/${flowToken}`,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
+        'Authorization': `${authToken}`
       }
     });
     

@@ -14,7 +14,7 @@ const calcularCashoutMaximo = async (telefone, cnpj, valorTotal, authToken) => {
       url: `${process.env.POLGO_API_URL}/fidelidade/v1/calculaValorMaximoCashout`,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`
+        Authorization: `${authToken}`
       },
       data: {
         usuario: telefone,

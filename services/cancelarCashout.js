@@ -14,7 +14,7 @@ const cancelarCashout = async (codigoControle, associadoCnpj, cpfColaborador, au
       url: `${process.env.POLGO_API_URL}/fidelidade/v1/cashout/cancelamento`,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`
+        Authorization: `${authToken}`
       },
       data: {
         codigoControle: codigoControle,

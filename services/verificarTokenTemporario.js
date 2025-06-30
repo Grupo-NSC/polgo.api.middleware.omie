@@ -10,7 +10,7 @@ const verificarTokenTemporario = async (usuario, voucher, authToken) => {
       url: `${process.env.POLGO_API_URL}/login/v1/autenticacaoTemporaria/verificar`,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`
+        Authorization: `${authToken}`
       },
       data: {
         usuario: usuario,

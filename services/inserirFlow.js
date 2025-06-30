@@ -18,7 +18,7 @@ const inserirFlow = async (idEmpresa, idCaixa, flowToken, valorTotal, cashoutMax
       url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow`,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`
+        Authorization: `${authToken}`
       },
       data: {
         idEmpresa: idEmpresa,
