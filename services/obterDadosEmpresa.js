@@ -20,15 +20,15 @@ const obterDadosEmpresa = async (idEmpresa, authToken) => {
     });
 
     const cnpj = companyResponse.data?.retorno?.cnpj;
-    const appSecret = companyResponse.data?.retorno?.credenciais?.appSecret;
-    const appKey = companyResponse.data?.retorno?.credenciais?.appKey;
+    const appSecret = companyResponse.data?.retorno?.credenciais?.pdv?.appSecret;
+    const appKey = companyResponse.data?.retorno?.credenciais?.pdv?.appKey;
     
     if (!cnpj || !appSecret || !appKey) {
       return {
         sucesso: false,
         erro: {
-          mensagem: 'CNPJ ou credenciais não encontrados na resposta da empresa',
-          detalhes: 'A resposta da API não contém CNPJ ou credenciais necessárias'
+          mensagem: 'CNPJ ou credenciais.pdv não encontrados na resposta da empresa',
+          detalhes: 'A resposta da API não contém CNPJ ou credenciais.pdv necessárias'
         }
       };
     }
