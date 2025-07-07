@@ -18,12 +18,12 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
 
   try {
     // 1. Extrair dados
-    telefone = data.Telefone?.replace(/[()\-\s]/g, '') || '';
-    nome = data.Nome || '';
+    telefone = data.Telefone_input?.replace(/[()\-\s]/g, '') || '';
+    nome = data.Nome_input || '';
     const flowT = flowToken || data.FlowToken;
 
     if (!telefone || !nome || !flowT) {
-      statusCode = 400;
+      statusCode = 200;
       responseBody = {
         screen: 'PreencherConsumidor',
         data: {
