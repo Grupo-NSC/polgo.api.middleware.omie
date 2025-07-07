@@ -3,7 +3,7 @@ import retryAxios from '../utils/retryAxios.js';
 
 const inserirFlow = async (idEmpresa, idCaixa, flowToken, valorTotal, cashoutMaximo, telefone, nome, authToken) => {
   try {
-    logger.info('Inserindo flow com valor máximo de cashout', { 
+    logger.info('Inserindo flow', { 
       idEmpresa, 
       idCaixa, 
       flowToken, 
@@ -33,12 +33,7 @@ const inserirFlow = async (idEmpresa, idCaixa, flowToken, valorTotal, cashoutMax
       }
     });
     
-    logger.info('Flow inserido com sucesso', {
-      status: flowResponse.status,
-      data: flowResponse.data,
-      flowToken: flowToken,
-      cashoutMaximo: cashoutMaximo
-    });
+    logger.info('Flow inserido com sucesso');
 
     return {
       sucesso: true,

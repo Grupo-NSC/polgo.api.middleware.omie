@@ -61,11 +61,26 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       };
       return;
     }
-    flowId = flowT;
+    const flowData = flowResult.data?.retorno || {};
+    const idEmpresa = flowData.idEmpresa;
+    const idCaixa = flowData.idCaixa;
+    const valorTotal = flowData.venda?.valor;
+    const cashoutMaximo = flowData.venda?.cashoutMaximo;
+    const flowId = flowData.id;
 
     // 4. Atualizar flow
     logger.info('Atualizando flow', { flowId, nome, telefone });
-    const updateResult = await atualizarFlow(flowId, { venda: { usuario: telefone, nome: nome } }, authToken);
+    const updateResult = await atualizarFlow(
+      flowId,
+      idEmpresa,
+      idCaixa,
+      flowT,
+      valorTotal,
+      cashoutMaximo,
+      telefone,
+      nome,
+      authToken
+    );
     if (!updateResult.sucesso) {
       statusCode = 400;
       responseBody = {
@@ -77,14 +92,15 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       return;
     }
 
+    // Criar etapa para validar o valor de cashout
+
     // 5. Sucesso
     statusCode = 200;
     responseBody = {
       screen: 'Cashback',
       data: {
-        Mensagem: 'Consumidor atualizado com sucesso',
         Nome: nome,
-        Telefone: telefone
+        Valor: 0
       }
     };
     return;
