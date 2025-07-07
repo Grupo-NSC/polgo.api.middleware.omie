@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import { logger } from './utils/logger.js';
 import initHandler from './actions/init.js';
-import dataExchangeHandler from './actions/dataExchange.js';
+import cashbackHandler from './actions/cashback.js';
+import identificarConsumidorHandler from './actions/identificarConsumidor.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -11,7 +12,7 @@ const omieWebhookHandler = async (event) => {
     logger.info('Recebendo webhook da Omie');
 
     const body = JSON.parse(event.body);
-    const { Action, Data, FlowToken } = body;
+    const { Action, Screen, Data, FlowToken } = body;
     logger.info('--- body -->', body);
 
     if (!Action || !Data) {
@@ -21,10 +22,20 @@ const omieWebhookHandler = async (event) => {
     switch (Action) {
       case 'init':
         return await initHandler({ data: Data, flowToken: FlowToken });
+      
       case 'data_exchange':
-        return await dataExchangeHandler({ data: Data, flowToken: FlowToken });
+        if (Screen == "Cashback")
+          return await cashbackHandler({ data: Data, flowToken: FlowToken });
+        
+        if (Screen == 'IdentificarConsumidor')
+          return await identificarConsumidorHandler({
+            data: Data,
+            flowToken: FlowToken
+          });
+        
+        throw new Error(`Ação não suportada: ${Action}/${Screen}`);
       default:
-        throw new Error(`Ação não suportada: ${Action}`);
+        throw new Error(`Ação não suportada: ${Action}/${Screen}`);
     }
   } catch (error) {
     logger.error('Erro ao processar webhook', { error: error.message });

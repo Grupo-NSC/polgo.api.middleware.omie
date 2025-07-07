@@ -6,12 +6,15 @@ import {
   obterDadosEmpresa,
   processarCashout,
   aplicarPagamento,
-  cancelarCashout
+  cancelarCashout,
+  registrarOperacaoFlow
 } from '../services/index.js';
 
-const dataExchangeHandler = async ({ data, flowToken }) => {
-  logger.info('Processando ação data_exchange', { data, flowToken });
+const cashbackHandler = async ({ data, flowToken }) => {
+  logger.info('Processando ação data_exchange/cashback', { data, flowToken });
 
+  let flowId = null;
+  let authToken = null;
   let idEmpresa = null;
   let idCaixa = null;
   let cashoutMaximo = 0;
@@ -19,6 +22,8 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
   let nome = "USUÁRIO";
   let valorCompra = 0;
   let cashoutCodigoControle = null; // Para armazenar o código de controle do cashout
+  let statusCode = 400;
+  let responseBody = {};
   
   try {
     // Extract values from request data
@@ -50,7 +55,7 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
         })
       };
     }
-    const authToken = authResult.dados.token;
+    authToken = authResult.dados.token;
 
     // Step 2: Check for flow data
     logger.info('Step 2: Verificando dados do flow');
@@ -75,6 +80,7 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
     usuario = flowResult.dados.usuario;
     nome = flowResult.dados.nome;
     valorCompra = flowResult.dados.valorCompra;
+    flowId = flowResult.dados.id
 
     logger.info('Dados do flow extraídos', {
       idEmpresa,
@@ -162,17 +168,16 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
         logger.info('Cashout cancelado com sucesso após falha no desconto');
       }
       
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          screen: 'Cashback',
-          data: {
-            Nome: nome,
-            Valor: cashoutMaximo,
-            MensagemDeErro: 'Não foi possível aplicar o desconto no pedido. Cashout foi cancelado automaticamente.'
-          }
-        })
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Não foi possível aplicar o desconto no pedido. Cashout foi cancelado automaticamente.'
+        }
       };
+      return;
     }
 
     logger.info('--- Resposta do desconto', {
@@ -185,19 +190,17 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
       })
     });
 
-    // Return success response
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: 'Data exchange processado com sucesso',
+    statusCode = 200;
+    responseBody = {
+      message: 'Data exchange processado com sucesso',
+      data: {
+        screen: "Confirmacao",
         data: {
-          screen: "Confirmacao",
-          data: {
-            Mensagem: "Cashback realizado com sucesso",
-          }
+          Mensagem: "Cashback realizado com sucesso",
         }
-      })
+      }
     };
+    return;
 
   } catch (error) {
     logger.error('Erro durante a etapa data_exchange', { 
@@ -212,8 +215,6 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
       });
       
       try {
-        // Precisamos do authToken e dados da empresa para cancelar
-        // Como não temos acesso direto aqui, vamos apenas logar
         logger.error('Não foi possível cancelar cashout automaticamente devido ao erro geral', {
           codigoControle: cashoutCodigoControle,
           erro: error.message
@@ -223,18 +224,43 @@ const dataExchangeHandler = async ({ data, flowToken }) => {
       }
     }
     
-    return {
-      statusCode: 400,
-      body: JSON.stringify({
-        screen: 'Cashback',
-        data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro: error.response?.data?.mensagem || error.message
-        }
-      })
+    statusCode = 400;
+    responseBody = {
+      screen: 'Cashback',
+      data: {
+        Nome: nome,
+        Valor: cashoutMaximo,
+        MensagemDeErro: error.response?.data?.mensagem || error.message
+      }
     };
+    return;
+  } finally {
+    if (flowId && authToken) {
+      try {
+        await registrarOperacaoFlow(
+          flowId,
+          'Cashback',
+          'data_exchange',
+          new Date().toISOString(),
+          authToken
+        );
+      } catch (e) {
+        logger.error('Erro ao registrar operação no finally', { erro: e.message });
+      }
+    }
+
+    logger.info('--- Resposta do flow', {
+      statusCode,
+      body: JSON.stringify(responseBody)
+    });
+
+    if (statusCode !== undefined && responseBody) {
+      return {
+        statusCode,
+        body: JSON.stringify(responseBody)
+      };
+    }
   }
 };
 
-export default dataExchangeHandler; 
+export default cashbackHandler; 

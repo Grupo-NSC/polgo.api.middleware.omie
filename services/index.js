@@ -7,6 +7,9 @@ export { obterDadosEmpresa } from './obterDadosEmpresa.js';
 // Serviços de flow
 export { verificarDadosFlow } from './verificarFlow.js';
 export { inserirFlow } from './inserirFlow.js';
+export { updateFlow } from './updateFlow.js';
+export { registrarOperacaoFlow } from './registrarOperacaoFlow.js';
+export { atualizarFlow } from './atualizarFlow.js';
 
 // Serviços de cashout
 export { calcularCashoutMaximo } from './calcularCashoutMaximo.js';
