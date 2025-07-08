@@ -10,7 +10,7 @@ import {
 } from '../services/index.js';
 
 const identificarConsumidorHandler = async ({ data, flowToken }) => {
-  logger.info('Iniciando ação preencherConsumidor', { data, flowToken });
+  logger.info('Iniciando ação identificarConsumidor', { data, flowToken });
 
   let authToken = null;
   let flowId = null;
@@ -26,23 +26,22 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     const flowT = flowToken || data.FlowToken;
 
     if (!flowT) {
-      statusCode = 200;
+      statusCode = 400;
       responseBody = {
         screen: 'ErroGenerico',
         data: {
-          ErrorMessenger:
-            'Flow toten não encontrado'
+          ErrorMessenger: `POLGO: Não foi possível seguir operação de Cashback - Flow não enviado`
         }
       };
       return;
     }
 
-    if (!telefone || !nome || !flowT) {
-      statusCode = 200;
+    if (!telefone || !nome) {
+      statusCode = 400;
       responseBody = {
         screen: 'PreencherConsumidor',
         data: {
-          MensagemDeErro: 'Telefone, nome e flowToken são obrigatórios.',
+          MensagemDeErro: 'Telefone e nome são obrigatórios.',
           errorNome_input: 'Nome obrigatório',
           errorTelefone_input: "Telefone obrigatório"
         }
@@ -54,11 +53,11 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     logger.info('Autenticando com Omie');
     const authResult = await autenticarComOmie();
     if (!authResult.sucesso) {
-      statusCode = 200;
+      statusCode = 401;
       responseBody = {
-        screen: 'PreencherConsumidor',
+        screen: 'ErroGenerico',
         data: {
-          MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
+          ErrorMessenger: `POLGO: Não foi possível autenticar usuário`
         }
       };
       return;
@@ -69,10 +68,11 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     logger.info('Buscando dados do flow');
     const flowResult = await verificarDadosFlow(flowT, authToken);
     if (!flowResult.sucesso) {
+      statusCode = 404;
       responseBody = {
         screen: 'ErroGenerico',
         data: {
-          ErrorMessenger: 'Flow não encontrado'
+          ErrorMessenger: `POLGO: Flow não encontrado`
         }
       };
       return;
@@ -93,7 +93,8 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       responseBody = {
         screen: 'ErroGenerico',
         data: {
-          ErrorMessenger: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+          ErrorMessenger:
+            'POLGO: Verificar cadastro de empresa {idEmpresa, cnpj}'
         }
       };
       return;
@@ -103,11 +104,11 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     // Consulta saldo do consumidor
     const cashoutResult = await calcularCashoutMaximo(telefone, cnpj, valorTotal, authToken);
     if (!cashoutResult.sucesso || !cashoutResult.dados || cashoutResult.dados.valorMaximo === 0) {
-      statusCode = 200;
+      statusCode = 404;
       responseBody = {
         screen: 'ErroGenerico',
         data: {
-          ErrorMessenger: 'Saldo do consumidor não encontrado ou igual a zero.'
+          ErrorMessenger: 'POLGO: Saldo do consumidor não encontrado ou igual a zero.'
         }
       };
       return;
@@ -118,11 +119,11 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     // Enviar notificação de autenticação temporária
     const notificacaoResult = await enviarNotificacaoToken(telefone, cnpj, authToken);
     if (!notificacaoResult.sucesso) {
-      statusCode = 200;
+      statusCode = 400;
       responseBody = {
         screen: 'ErroGenerico',
         data: {
-          ErrorMessenger: 'Erro ao enviar notificação: ' + notificacaoResult.erro.mensagem
+          ErrorMessenger: 'POLGO: Erro ao enviar notificação'
         }
       };
       return;
@@ -142,11 +143,12 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       authToken
     );
     if (!updateResult.sucesso) {
-      statusCode = 200;
+      statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          MensagemDeErro: 'Erro ao atualizar flow: ' + updateResult.erro.mensagem
+          ErrorMessenger:
+            'POLGO: Não foi possível continuar operação'
         }
       };
       return;
@@ -165,15 +167,15 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     };
     return;
   } catch (error) {
-    logger.error('Erro durante a ação preencherConsumidor', {
+    logger.error('Erro durante a ação identificarConsumidor', {
       error: error.message,
       response: error.response?.data
     });
-    statusCode = 200;
+    statusCode = 400;
     responseBody = {
       screen: 'ErroGenerico',
       data: {
-        ErrorMessenger: error.message
+        ErrorMessenger: `POLGO: Não foi possível completar operação de Cashback - ${error.body}`
       }
     };
     return;
@@ -193,7 +195,7 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       logger.error('Erro ao registrar operação no finally', { erro: e.message });
     }
 
-    logger.info('--- Resposta do preencherConsumidor', {
+    logger.info('--- Resposta do identuficarConsumidor', {
       statusCode,
       body: JSON.stringify(responseBody)
     });

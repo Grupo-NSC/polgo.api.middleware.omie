@@ -37,17 +37,26 @@ const initHandler = async ({ data, flowToken }) => {
       nome
     });
 
+    if (!flowT) {
+      statusCode = 400;
+      responseBody = {
+        screen: 'ErroGenerico',
+        data: {
+          ErrorMessenger: `POLGO: Não foi possível seguir operação de Cashback - Flow não enviado`
+        }
+      };
+      return;
+    }
+
     // Step 1: Authenticate with Omie
     logger.info('Step 1: Autenticando com Omie');
     const authResult = await autenticarComOmie();
     if (!authResult.sucesso) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: 0,
-          MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
+          ErrorMessenger: "POLGO: Não foi possível autenticar",
         }
       };
       return;
@@ -78,14 +87,13 @@ const initHandler = async ({ data, flowToken }) => {
       );
 
       flowId = flowResult.dados?.retorno?.id || flowResult.dados?.id;
-      console.log(flowResult.dados, flowId);
 
       if (!flowResult.sucesso) {
         statusCode = 400;
         responseBody = {
-          screen: 'IdentificarConsumidor',
+          screen: 'ErroGenerico',
           data: {
-            MensagemDeErro: 'Erro ao inserir flow: ' + flowResult.erro.mensagem
+            ErrorMessenger: 'POLGO: Não foi possível realizar operação com Cashback'
           }
         };
         return;
@@ -105,12 +113,9 @@ const initHandler = async ({ data, flowToken }) => {
     if (!empresaResult.sucesso) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: 0,
-          MensagemDeErro:
-            'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+          ErrorMessenger: 'POLGO: Verificar cadastro de empresa {idEmpresa, cnpj}'
         }
       };
       return;
@@ -127,19 +132,22 @@ const initHandler = async ({ data, flowToken }) => {
       valorTotal,
       authToken
     );
-    if (!cashoutResult.sucesso) {
-      statusCode = 400;
+
+    if (
+      !cashoutResult.sucesso ||
+      !cashoutResult.dados ||
+      cashoutResult.dados.valorMaximo === 0
+    ) {
+      statusCode = 200;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: 0,
-          MensagemDeErro:
-            'Erro ao calcular cashout: ' + cashoutResult.erro.mensagem
+          ErrorMessenger: 'POLGO: Saldo do consumidor não encontrado ou igual a zero.'
         }
       };
       return;
     }
+
     cashoutMaximo = cashoutResult.dados.valorMaximo;
 
     // Step 4: Send temporary authentication notification
@@ -152,12 +160,10 @@ const initHandler = async ({ data, flowToken }) => {
     if (!notificacaoResult.sucesso) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro:
-            'Erro ao enviar notificação: ' + notificacaoResult.erro.mensagem
+          ErrorMessenger:
+            'POLGO: Não foi possível enviar notificação'
         }
       };
       return;
@@ -178,11 +184,10 @@ const initHandler = async ({ data, flowToken }) => {
     if (!flowResult.sucesso) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro ao inserir flow: ' + flowResult.erro.mensagem
+          ErrorMessenger:
+            'POLGO: Não foi possível avançar para próxima etapa'
         }
       };
       return;
@@ -211,11 +216,9 @@ const initHandler = async ({ data, flowToken }) => {
 
     statusCode = 400;
     responseBody = {
-      screen: 'Cashback',
+      screen: 'ErroGenerico',
       data: {
-        Nome: nome || 'USUÁRIO',
-        Valor: 0,
-        MensagemDeErro: error.message
+        ErrorMessenger: `POLGO: Não foi possível completar operação de Cashback - ${error.body}`
       }
     };
     return;

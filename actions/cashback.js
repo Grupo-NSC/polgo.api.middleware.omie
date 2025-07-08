@@ -26,39 +26,30 @@ const cashbackHandler = async ({ data, flowToken }) => {
   let responseBody = {};
   
   try {
-    // Extract values from request data
-    const voucher = data.Voucher;
     const flowT = flowToken || data.FlowToken;
-    
-    if (!voucher || !flowT) {
+
+    if (!flowT) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro: 'Voucher e flowToken são obrigatórios'
+          ErrorMessenger: `POLGO: Não foi possível seguir operação de Cashback - Flow não enviado`
         }
       };
       return;
     }
-    
-    logger.info('Valores extraídos da requisição', {
-      voucher,
-      flowToken: flowT
-    });
 
     // Step 1: Authenticate with Omie
     logger.info('Step 1: Autenticando com Omie');
     const authResult = await autenticarComOmie();
     if (!authResult.sucesso) {
-      statusCode = 400;
+      statusCode = 401;
       responseBody = {
         screen: 'Cashback',
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
+          MensagemDeErro: 'POLGO: Não foi possível autenticar'
         }
       };
       return;
@@ -71,16 +62,15 @@ const cashbackHandler = async ({ data, flowToken }) => {
     if (!flowResult.sucesso) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro ao verificar flow: ' + flowResult.erro.mensagem
+          ErrorMessenger:
+            'POLGO: Flow não encontrado'
         }
       };
       return;
     }
-    
+
     idEmpresa = flowResult.dados.idEmpresa;
     idCaixa = flowResult.dados.idCaixa;
     cashoutMaximo = flowResult.dados.cashoutMaximo;
@@ -98,9 +88,34 @@ const cashbackHandler = async ({ data, flowToken }) => {
       nome
     });
 
+    // Extract values from request data
+    const voucher = data.Voucher;
+
+    if (!voucher) {
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Voucher é obrigatório'
+        }
+      };
+      return;
+    }
+
+    logger.info('Valores extraídos da requisição', {
+      voucher,
+      flowToken: flowT
+    });
+
     // Step 3: Verify if temporary token is valid
     logger.info('Step 3: Verificando token temporário');
-    const tokenResult = await verificarTokenTemporario(usuario, voucher, authToken);
+    const tokenResult = await verificarTokenTemporario(
+      usuario,
+      voucher,
+      authToken
+    );
     if (!tokenResult.sucesso) {
       statusCode = 400;
       responseBody = {
@@ -108,7 +123,8 @@ const cashbackHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro na verificação do token: ' + tokenResult.erro.mensagem
+          MensagemDeErro:
+            'Token de 6 dígitos inválido ou expirado'
         }
       };
       return;
@@ -120,11 +136,9 @@ const cashbackHandler = async ({ data, flowToken }) => {
     if (!empresaResult.sucesso) {
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+          ErrorMessenger: `POLGO: Verificar cadastro de empresa {idEmpresa, cnpj}`
         }
       };
       return;
@@ -133,7 +147,13 @@ const cashbackHandler = async ({ data, flowToken }) => {
 
     // Step 5: Cashout operation
     logger.info('Step 5: Realizando operação de cashout');
-    const cashoutResult = await processarCashout(usuario, cashoutMaximo, cnpj, valorCompra, authToken);
+    const cashoutResult = await processarCashout(
+      usuario,
+      cashoutMaximo,
+      cnpj,
+      valorCompra,
+      authToken
+    );
     if (!cashoutResult.sucesso) {
       statusCode = 400;
       responseBody = {
@@ -141,28 +161,46 @@ const cashbackHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro no processamento de cashout: ' + cashoutResult.erro.mensagem
+          MensagemDeErro:
+            'POLGO: Não foi possível realizar o cashout: ' + cashoutResult.erro.mensagem
         }
       };
       return;
     }
-    
+
     // Armazenar o código de controle do cashout para possível cancelamento
     cashoutCodigoControle = cashoutResult.dados.codigoControle;
-    logger.info('Código de controle do cashout armazenado', { cashoutCodigoControle });
+    logger.info('Código de controle do cashout armazenado', {
+      cashoutCodigoControle
+    });
 
     // Step 6: Apply discount
     logger.info('Step 6: Aplicando desconto');
-    const pagamentoResult = await aplicarPagamento(flowT, idEmpresa, idCaixa, cashoutMaximo, appKey, appSecret);
+    const pagamentoResult = await aplicarPagamento(
+      flowT,
+      idEmpresa,
+      idCaixa,
+      cashoutMaximo,
+      appKey,
+      appSecret
+    );
     if (!pagamentoResult.sucesso) {
       // Se a aplicação do desconto falhar, cancelar o cashout automaticamente
-      logger.warn('Falha na aplicação do desconto, cancelando cashout automaticamente', {
-        codigoControle: cashoutCodigoControle,
-        cnpj: cnpj,
-        usuario: usuario
-      });
-      
-      const cancelamentoResult = await cancelarCashout(cashoutCodigoControle, cnpj, usuario, authToken);
+      logger.warn(
+        'Falha na aplicação do desconto, cancelando cashout automaticamente',
+        {
+          codigoControle: cashoutCodigoControle,
+          cnpj: cnpj,
+          usuario: usuario
+        }
+      );
+
+      const cancelamentoResult = await cancelarCashout(
+        cashoutCodigoControle,
+        cnpj,
+        usuario,
+        authToken
+      );
       if (!cancelamentoResult.sucesso) {
         logger.error('Erro ao cancelar cashout após falha no desconto', {
           erro: cancelamentoResult.erro
@@ -171,14 +209,13 @@ const cashbackHandler = async ({ data, flowToken }) => {
       } else {
         logger.info('Cashout cancelado com sucesso após falha no desconto');
       }
-      
+
       statusCode = 400;
       responseBody = {
-        screen: 'Cashback',
+        screen: 'ErroGenerico',
         data: {
-          Nome: nome,
-          Valor: cashoutMaximo,
-          MensagemDeErro: 'Não foi possível aplicar o desconto no pedido. Cashout foi cancelado automaticamente.'
+          ErrorMessenger:
+            'POLGO: Não foi possível aplicar o desconto no pedido. Cashout foi cancelado automaticamente'
         }
       };
       return;
@@ -200,7 +237,7 @@ const cashbackHandler = async ({ data, flowToken }) => {
       data: {
         screen: 'Confirmacao',
         data: {
-          Mensagem: 'Cashback realizado com sucesso',
+          Mensagem: 'Cashback realizado com sucesso'
         }
       }
     };
