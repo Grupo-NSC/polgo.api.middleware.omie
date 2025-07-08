@@ -3,7 +3,10 @@ import {
   autenticarComOmie,
   verificarDadosFlow,
   atualizarFlow,
-  registrarOperacaoFlow
+  registrarOperacaoFlow,
+  obterDadosEmpresa,
+  calcularCashoutMaximo,
+  enviarNotificacaoToken
 } from '../services/index.js';
 
 const identificarConsumidorHandler = async ({ data, flowToken }) => {
@@ -22,12 +25,26 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     nome = data.Nome_input || '';
     const flowT = flowToken || data.FlowToken;
 
+    if (!flowT) {
+      statusCode = 200;
+      responseBody = {
+        screen: 'ErroGenerico',
+        data: {
+          ErrorMessenger:
+            'Flow toten não encontrado'
+        }
+      };
+      return;
+    }
+
     if (!telefone || !nome || !flowT) {
       statusCode = 200;
       responseBody = {
         screen: 'PreencherConsumidor',
         data: {
-          MensagemDeErro: 'Telefone, nome e flowToken são obrigatórios.'
+          MensagemDeErro: 'Telefone, nome e flowToken são obrigatórios.',
+          errorNome_input: 'Nome obrigatório',
+          errorTelefone_input: "Telefone obrigatório"
         }
       };
       return;
@@ -37,7 +54,7 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     logger.info('Autenticando com Omie');
     const authResult = await autenticarComOmie();
     if (!authResult.sucesso) {
-      statusCode = 400;
+      statusCode = 200;
       responseBody = {
         screen: 'PreencherConsumidor',
         data: {
@@ -52,21 +69,64 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     logger.info('Buscando dados do flow');
     const flowResult = await verificarDadosFlow(flowT, authToken);
     if (!flowResult.sucesso) {
-      statusCode = 400;
       responseBody = {
-        screen: 'PreencherConsumidor',
+        screen: 'ErroGenerico',
         data: {
-          MensagemDeErro: 'Erro ao buscar flow: ' + flowResult.erro.mensagem
+          ErrorMessenger: 'Flow não encontrado'
         }
       };
       return;
     }
-    const flowData = flowResult.data?.retorno || {};
+
+    const flowData = flowResult.dados || {};
+
     const idEmpresa = flowData.idEmpresa;
     const idCaixa = flowData.idCaixa;
-    const valorTotal = flowData.venda?.valor;
-    const cashoutMaximo = flowData.venda?.cashoutMaximo;
-    const flowId = flowData.id;
+    const valorTotal = flowData.valorCompra;
+    let cashoutMaximo = flowData.cashoutMaximo;
+    flowId = flowData.id;
+    // Consulta CNPJ da empresa
+    const empresaResult = await obterDadosEmpresa(idEmpresa, authToken);
+    
+    if (!empresaResult.sucesso) {
+      statusCode = 400;
+      responseBody = {
+        screen: 'ErroGenerico',
+        data: {
+          ErrorMessenger: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+        }
+      };
+      return;
+    }
+    const cnpj = empresaResult.dados.cnpj;
+
+    // Consulta saldo do consumidor
+    const cashoutResult = await calcularCashoutMaximo(telefone, cnpj, valorTotal, authToken);
+    if (!cashoutResult.sucesso || !cashoutResult.dados || cashoutResult.dados.valorMaximo === 0) {
+      statusCode = 200;
+      responseBody = {
+        screen: 'ErroGenerico',
+        data: {
+          ErrorMessenger: 'Saldo do consumidor não encontrado ou igual a zero.'
+        }
+      };
+      return;
+    }
+
+    cashoutMaximo = cashoutResult.dados.valorMaximo;
+
+    // Enviar notificação de autenticação temporária
+    const notificacaoResult = await enviarNotificacaoToken(telefone, cnpj, authToken);
+    if (!notificacaoResult.sucesso) {
+      statusCode = 200;
+      responseBody = {
+        screen: 'ErroGenerico',
+        data: {
+          ErrorMessenger: 'Erro ao enviar notificação: ' + notificacaoResult.erro.mensagem
+        }
+      };
+      return;
+    }
 
     // 4. Atualizar flow
     logger.info('Atualizando flow', { flowId, nome, telefone });
@@ -82,7 +142,7 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       authToken
     );
     if (!updateResult.sucesso) {
-      statusCode = 400;
+      statusCode = 200;
       responseBody = {
         screen: 'Cashback',
         data: {
@@ -100,7 +160,7 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       screen: 'Cashback',
       data: {
         Nome: nome,
-        Valor: 0
+        Valor: cashoutMaximo
       }
     };
     return;
@@ -109,11 +169,11 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       error: error.message,
       response: error.response?.data
     });
-    statusCode = 400;
+    statusCode = 200;
     responseBody = {
-      screen: 'Cashback',
+      screen: 'ErroGenerico',
       data: {
-        MensagemDeErro: error.message
+        ErrorMessenger: error.message
       }
     };
     return;
@@ -123,8 +183,8 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       if (flowId && authToken) {
         await registrarOperacaoFlow(
           flowId,
-          'Cashback',
-          'preencherConsumidor',
+          'IdentificarConsumidor',
+          'data_exchange',
           new Date().toISOString(),
           authToken
         );
@@ -132,10 +192,12 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
     } catch (e) {
       logger.error('Erro ao registrar operação no finally', { erro: e.message });
     }
+
     logger.info('--- Resposta do preencherConsumidor', {
       statusCode,
       body: JSON.stringify(responseBody)
     });
+    
     return {
       statusCode,
       body: JSON.stringify(responseBody)

@@ -33,6 +33,7 @@ const verificarDadosFlow = async (flowToken, authToken) => {
     return {
       sucesso: true,
       dados: {
+        id: flowCheckData.id,
         idEmpresa: flowCheckData.idEmpresa,
         idCaixa: flowCheckData.idCaixa,
         cashoutMaximo: flowCheckData.venda?.cashoutMaximo || 0,

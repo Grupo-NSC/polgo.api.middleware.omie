@@ -31,7 +31,16 @@ const cashbackHandler = async ({ data, flowToken }) => {
     const flowT = flowToken || data.FlowToken;
     
     if (!voucher || !flowT) {
-      throw new Error('Voucher e flowToken são obrigatórios');
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Voucher e flowToken são obrigatórios'
+        }
+      };
+      return;
     }
     
     logger.info('Valores extraídos da requisição', {
@@ -43,17 +52,16 @@ const cashbackHandler = async ({ data, flowToken }) => {
     logger.info('Step 1: Autenticando com Omie');
     const authResult = await autenticarComOmie();
     if (!authResult.sucesso) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          screen: 'Cashback',
-          data: {
-            Nome: nome,
-            Valor: cashoutMaximo,
-            MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
-          }
-        })
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Erro na autenticação: ' + authResult.erro.mensagem
+        }
       };
+      return;
     }
     authToken = authResult.dados.token;
 
@@ -61,17 +69,16 @@ const cashbackHandler = async ({ data, flowToken }) => {
     logger.info('Step 2: Verificando dados do flow');
     const flowResult = await verificarDadosFlow(flowT, authToken);
     if (!flowResult.sucesso) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          screen: 'Cashback',
-          data: {
-            Nome: nome,
-            Valor: cashoutMaximo,
-            MensagemDeErro: 'Erro ao verificar flow: ' + flowResult.erro.mensagem
-          }
-        })
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Erro ao verificar flow: ' + flowResult.erro.mensagem
+        }
       };
+      return;
     }
     
     idEmpresa = flowResult.dados.idEmpresa;
@@ -80,7 +87,7 @@ const cashbackHandler = async ({ data, flowToken }) => {
     usuario = flowResult.dados.usuario;
     nome = flowResult.dados.nome;
     valorCompra = flowResult.dados.valorCompra;
-    flowId = flowResult.dados.id
+    flowId = flowResult.dados.id;
 
     logger.info('Dados do flow extraídos', {
       idEmpresa,
@@ -95,34 +102,32 @@ const cashbackHandler = async ({ data, flowToken }) => {
     logger.info('Step 3: Verificando token temporário');
     const tokenResult = await verificarTokenTemporario(usuario, voucher, authToken);
     if (!tokenResult.sucesso) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          screen: 'Cashback',
-          data: {
-            Nome: nome,
-            Valor: cashoutMaximo,
-            MensagemDeErro: 'Erro na verificação do token: ' + tokenResult.erro.mensagem
-          }
-        })
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Erro na verificação do token: ' + tokenResult.erro.mensagem
+        }
       };
+      return;
     }
 
     // Step 4: Get CNPJ from company
     logger.info('Step 4: Obtendo CNPJ da empresa');
     const empresaResult = await obterDadosEmpresa(idEmpresa, authToken);
     if (!empresaResult.sucesso) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          screen: 'Cashback',
-          data: {
-            Nome: nome,
-            Valor: cashoutMaximo,
-            MensagemDeErro: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
-          }
-        })
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+        }
       };
+      return;
     }
     const { cnpj, appSecret, appKey } = empresaResult.dados;
 
@@ -130,17 +135,16 @@ const cashbackHandler = async ({ data, flowToken }) => {
     logger.info('Step 5: Realizando operação de cashout');
     const cashoutResult = await processarCashout(usuario, cashoutMaximo, cnpj, valorCompra, authToken);
     if (!cashoutResult.sucesso) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          screen: 'Cashback',
-          data: {
-            Nome: nome,
-            Valor: cashoutMaximo,
-            MensagemDeErro: 'Erro no processamento de cashout: ' + cashoutResult.erro.mensagem
-          }
-        })
+      statusCode = 400;
+      responseBody = {
+        screen: 'Cashback',
+        data: {
+          Nome: nome,
+          Valor: cashoutMaximo,
+          MensagemDeErro: 'Erro no processamento de cashout: ' + cashoutResult.erro.mensagem
+        }
       };
+      return;
     }
     
     // Armazenar o código de controle do cashout para possível cancelamento
@@ -194,14 +198,13 @@ const cashbackHandler = async ({ data, flowToken }) => {
     responseBody = {
       message: 'Data exchange processado com sucesso',
       data: {
-        screen: "Confirmacao",
+        screen: 'Confirmacao',
         data: {
-          Mensagem: "Cashback realizado com sucesso",
+          Mensagem: 'Cashback realizado com sucesso',
         }
       }
     };
     return;
-
   } catch (error) {
     logger.error('Erro durante a etapa data_exchange', { 
       error: error.message,

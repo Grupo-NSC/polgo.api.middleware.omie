@@ -13,7 +13,7 @@ const atualizarFlow = async (
   authToken
 ) => {
   try {
-    logger.info('Inserindo flow', {
+    logger.info('Atualizando flow', {
       id,
       idEmpresa,
       idCaixa,

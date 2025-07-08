@@ -24,7 +24,8 @@ const initHandler = async ({ data, flowToken }) => {
     const idEmpresa = data.IdEmpresa;
     const idCaixa = data.IdCaixa;
     const flowT = flowToken || data.FlowToken;
-    const telefone = data.NfeDestinatario?.Telefone?.replace(/[()\-\s]/g, '') || '';
+    const telefone =
+      data.NfeDestinatario?.Telefone?.replace(/[()\-\s]/g, '') || '';
     nome = data.NfeDestinatario?.Nome || '';
 
     logger.info('Valores extraídos da requisição', {
@@ -35,35 +36,6 @@ const initHandler = async ({ data, flowToken }) => {
       telefone,
       nome
     });
-
-    // Se telefone ou nome não estiverem preenchidos, inserir flow sem esses dados e retornar para ConfirmarCliente
-    if (!telefone || !nome) {
-      logger.info('Dados incompletos do destinatário, inserindo flow parcial e retornando para ConfirmarCliente', {
-        idEmpresa,
-        idCaixa,
-        flowToken: flowT,
-        valorTotal
-      });
-      // Inserir flow sem telefone, nome e cashoutMaximo
-      const flowResult = await inserirFlow(idEmpresa, idCaixa, flowT, valorTotal, 0, '', '', null);
-      if (!flowResult.sucesso) {
-        statusCode = 400;
-        responseBody = {
-          screen: 'IdentificarConsumidor',
-          data: {
-            MensagemDeErro: 'Erro ao inserir flow: ' + flowResult.erro.mensagem
-          }
-        };
-        return;
-      }
-      
-      statusCode = 200;
-      responseBody = {
-        screen: 'IdentificarConsumidor',
-        data: {}
-      };
-      return;
-    }
 
     // Step 1: Authenticate with Omie
     logger.info('Step 1: Autenticando com Omie');
@@ -82,6 +54,51 @@ const initHandler = async ({ data, flowToken }) => {
     }
     authToken = authResult.dados.token;
 
+    // Se telefone ou nome não estiverem preenchidos, inserir flow sem esses dados e retornar para ConfirmarCliente
+    if (!telefone || !nome) {
+      logger.info(
+        'Dados incompletos do destinatário, inserindo flow parcial e retornando para ConfirmarCliente',
+        {
+          idEmpresa,
+          idCaixa,
+          flowToken: flowT,
+          valorTotal
+        }
+      );
+      // Inserir flow sem telefone, nome e cashoutMaximo
+      const flowResult = await inserirFlow(
+        idEmpresa,
+        idCaixa,
+        flowT,
+        valorTotal,
+        0,
+        '',
+        '',
+        null
+      );
+
+      flowId = flowResult.dados?.retorno?.id || flowResult.dados?.id;
+      console.log(flowResult.dados, flowId);
+
+      if (!flowResult.sucesso) {
+        statusCode = 400;
+        responseBody = {
+          screen: 'IdentificarConsumidor',
+          data: {
+            MensagemDeErro: 'Erro ao inserir flow: ' + flowResult.erro.mensagem
+          }
+        };
+        return;
+      }
+
+      statusCode = 200;
+      responseBody = {
+        screen: 'IdentificarConsumidor',
+        data: {}
+      };
+      return;
+    }
+
     // Step 2: Get company data
     logger.info('Step 2: Obtendo dados da empresa');
     const empresaResult = await obterDadosEmpresa(idEmpresa, authToken);
@@ -92,7 +109,8 @@ const initHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: 0,
-          MensagemDeErro: 'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
+          MensagemDeErro:
+            'Erro ao obter dados da empresa: ' + empresaResult.erro.mensagem
         }
       };
       return;
@@ -103,7 +121,12 @@ const initHandler = async ({ data, flowToken }) => {
 
     // Step 3: Calculate maximum cashout value
     logger.info('Step 3: Calculando valor máximo de cashout');
-    const cashoutResult = await calcularCashoutMaximo(telefone, cnpj, valorTotal, authToken);
+    const cashoutResult = await calcularCashoutMaximo(
+      telefone,
+      cnpj,
+      valorTotal,
+      authToken
+    );
     if (!cashoutResult.sucesso) {
       statusCode = 400;
       responseBody = {
@@ -111,7 +134,8 @@ const initHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: 0,
-          MensagemDeErro: 'Erro ao calcular cashout: ' + cashoutResult.erro.mensagem
+          MensagemDeErro:
+            'Erro ao calcular cashout: ' + cashoutResult.erro.mensagem
         }
       };
       return;
@@ -120,7 +144,11 @@ const initHandler = async ({ data, flowToken }) => {
 
     // Step 4: Send temporary authentication notification
     logger.info('Step 4: Enviando notificação de autenticação temporária');
-    const notificacaoResult = await enviarNotificacaoToken(telefone, cnpj, authToken);
+    const notificacaoResult = await enviarNotificacaoToken(
+      telefone,
+      cnpj,
+      authToken
+    );
     if (!notificacaoResult.sucesso) {
       statusCode = 400;
       responseBody = {
@@ -128,7 +156,8 @@ const initHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro: 'Erro ao enviar notificação: ' + notificacaoResult.erro.mensagem
+          MensagemDeErro:
+            'Erro ao enviar notificação: ' + notificacaoResult.erro.mensagem
         }
       };
       return;
@@ -136,7 +165,16 @@ const initHandler = async ({ data, flowToken }) => {
 
     // Step 5: Insert flow with cashout maximum value
     logger.info('Step 5: Inserindo flow com valor máximo de cashout');
-    const flowResult = await inserirFlow(idEmpresa, idCaixa, flowT, valorTotal, cashoutMaximo, telefone, nome, authToken);
+    const flowResult = await inserirFlow(
+      idEmpresa,
+      idCaixa,
+      flowT,
+      valorTotal,
+      cashoutMaximo,
+      telefone,
+      nome,
+      authToken
+    );
     if (!flowResult.sucesso) {
       statusCode = 400;
       responseBody = {
@@ -149,6 +187,8 @@ const initHandler = async ({ data, flowToken }) => {
       };
       return;
     }
+
+    console.log(flowResult);
     flowId = flowResult.dados?.retorno?.id || flowResult.dados?.id;
 
     statusCode = 200;

@@ -7,7 +7,7 @@ const registrarOperacaoFlow = async (id, screen, action, dataHora, authToken) =>
 
     const response = await retryAxios({
       method: 'POST',
-      url: `${process.env.POLGO_API_URL}/omie/flow/${id}/operacoes`,
+      url: `${process.env.POLGO_API_URL}/integracao/v1/omie/flow/${id}/operacoes`,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `${authToken}`
