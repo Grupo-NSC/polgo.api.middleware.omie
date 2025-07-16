@@ -89,7 +89,7 @@ const cashbackHandler = async ({ data, flowToken }) => {
     });
 
     // Extract values from request data
-    const voucher = data.Voucher;
+    const voucher = data.Vouncher_input;
 
     if (!voucher) {
       statusCode = 400;
@@ -123,8 +123,8 @@ const cashbackHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro:
-            'Token de 6 dígitos inválido ou expirado'
+          MensagemDeErro: 'Token de 6 dígitos inválido ou expirado',
+          errorVouncher_input: 'Token de 6 dígitos inválido ou expirado'
         }
       };
       return;
