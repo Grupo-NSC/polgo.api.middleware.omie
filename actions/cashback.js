@@ -98,7 +98,7 @@ const cashbackHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro: 'Voucher é obrigatório'
+          errorVouncher_input: 'Voucher é obrigatório'
         }
       };
       return;
@@ -123,7 +123,6 @@ const cashbackHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro: 'Token de 6 dígitos inválido ou expirado',
           errorVouncher_input: 'Token de 6 dígitos inválido ou expirado'
         }
       };
@@ -161,8 +160,9 @@ const cashbackHandler = async ({ data, flowToken }) => {
         data: {
           Nome: nome,
           Valor: cashoutMaximo,
-          MensagemDeErro:
-            'POLGO: Não foi possível realizar o cashout: ' + cashoutResult.erro.mensagem
+          errorVouncher_input:
+            'POLGO: Não foi possível realizar o cashout: ' +
+            cashoutResult.erro.mensagem
         }
       };
       return;
