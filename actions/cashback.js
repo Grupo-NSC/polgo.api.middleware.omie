@@ -291,12 +291,12 @@ const cashbackHandler = async ({ data, flowToken }) => {
 
     logger.info('--- Resposta do flow', {
       statusCode,
-      body: JSON.stringify(responseBody)
+      responseBody
     });
 
     if (statusCode !== undefined && responseBody) {
       return {
-        statusCode,
+        statusCode: 200,
         body: JSON.stringify(responseBody)
       };
     }

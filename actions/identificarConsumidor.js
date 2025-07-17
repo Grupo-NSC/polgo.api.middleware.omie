@@ -195,13 +195,13 @@ const identificarConsumidorHandler = async ({ data, flowToken }) => {
       logger.error('Erro ao registrar operação no finally', { erro: e.message });
     }
 
-    logger.info('--- Resposta do identuficarConsumidor', {
+    logger.info('--- Resposta do identificarConsumidor', {
       statusCode,
-      body: JSON.stringify(responseBody)
+      responseBody
     });
     
     return {
-      statusCode,
+      statusCode: 200,
       body: JSON.stringify(responseBody)
     };
   }
